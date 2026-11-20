@@ -50,6 +50,12 @@ const getCachedKey = () => keyStore("readonly", (st) => st.get(slug));
 const cacheKey = (key) => keyStore("readwrite", (st) => st.put(key, slug));
 const clearCachedKey = () => keyStore("readwrite", (st) => st.delete(slug));
 
+$("forget").addEventListener("click", async (e) => {
+  e.preventDefault();
+  await keyStore("readwrite", (st) => st.clear()); // remembered unlock keys
+  location.reload();
+});
+
 async function deriveKey(password, meta) {
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(

@@ -14,3 +14,5 @@ button:disabled, input:disabled { opacity:.5; cursor:not-allowed; }
 #cal { margin-top:20px; }
 .note { margin:0; font-size:.85em; opacity:.7; }
 [hidden] { display:none !important; }
+footer { margin-top:40px; text-align:center; font-size:.75rem; }
+footer a { color:inherit; opacity:.5; }
