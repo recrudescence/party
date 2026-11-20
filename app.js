@@ -26,13 +26,39 @@ async function getJSON(url) {
   return res.json();
 }
 
-// Decrypts parties/<slug>/party.enc -> { title, alt, date, html, calendar, flyer:{mime,data} }
-async function decrypt(password) {
-  const meta = await getJSON(`parties/${slug}/party.enc`);
+// Parties are decrypted with an AES key derived from the password. After a successful
+// unlock we cache that (non-extractable) CryptoKey in IndexedDB, so the password itself
+// is never stored and revisits skip the prompt. A changed party.enc (new salt) invalidates it.
+const idb = () => new Promise((resolve, reject) => {
+  const req = indexedDB.open("party", 1);
+  req.onupgradeneeded = () => req.result.createObjectStore("keys");
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+async function keyStore(mode, fn) {
+  try {
+    const db = await idb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("keys", mode);
+      const req = fn(tx.objectStore("keys"));
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = tx.onabort = () => reject(tx.error);
+    });
+  } catch { return undefined; } // IndexedDB unavailable (private mode etc.): just don't cache
+}
+const getCachedKey = () => keyStore("readonly", (st) => st.get(slug));
+const cacheKey = (key) => keyStore("readwrite", (st) => st.put(key, slug));
+const clearCachedKey = () => keyStore("readwrite", (st) => st.delete(slug));
+
+async function deriveKey(password, meta) {
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
-  const key = await crypto.subtle.deriveKey(
+  return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: b64(meta.salt), iterations: meta.iter, hash: "SHA-256" },
     base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+}
+
+// Decrypts parties/<slug>/party.enc -> { title, alt, date, html, calendar, flyer:{mime,data} }
+async function decryptWith(key, meta) {
   let plain;
   try {
     plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(meta.iv) }, key, b64(meta.data));
@@ -66,8 +92,19 @@ try {
   const slugs = await getJSON("parties/index.json");
   slug = slugs[slugs.length - 1];
   if (!slug) throw new Error("no parties");
-  $("gate").hidden = false;
-  lockIfNeeded();
+  const cached = await getCachedKey();
+  if (cached) {
+    try {
+      render(await decryptWith(cached, await getJSON(`parties/${slug}/party.enc`)));
+    } catch (err) {
+      if (err.message === "badpw") await clearCachedKey(); // party was re-encrypted: ask again
+      else throw err;
+    }
+  }
+  if ($("gate").hidden && $("invite").hidden) {
+    $("gate").hidden = false;
+    lockIfNeeded();
+  }
 } catch (err) {
   console.error(err);
   $("msg").textContent = "Couldn't load the invite. Open via http(s), not file://.";
@@ -78,7 +115,11 @@ $("gate").addEventListener("submit", async (e) => {
   if (!slug || lockIfNeeded()) return;
   $("msg").textContent = "";
   try {
-    render(await decrypt($("pw").value));
+    const meta = await getJSON(`parties/${slug}/party.enc`);
+    const key = await deriveKey($("pw").value, meta);
+    const party = await decryptWith(key, meta);
+    await cacheKey(key);
+    render(party);
   } catch (err) {
     if (err.message !== "badpw") {
       console.error(err);

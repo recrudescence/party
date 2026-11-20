@@ -4,22 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>You're invited</title>
+  <title>hannah & calvin's latest party</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main>
     <form id="gate" autocomplete="off" hidden>
-      <h1>You're invited</h1>
-      <label for="pw">Password</label>
-      <input id="pw" type="password" autocomplete="current-password" required autofocus>
-      <button type="submit">Enter</button>
+      <h1>come to our party! pw first tho</h1>
+      <label for="pw">password</label>
+      <input id="pw" type="text" autocomplete="current-password" required autofocus>
+      <button type="submit">enter</button>
       <p id="msg" role="alert"></p>
     </form>
 
     <section id="invite" hidden>
+      <h1>
+        you're invited to H&C's latest!
+      </h1>
       <img id="flyer" alt="Party invitation flyer">
-      <div id="extra"></div>
+      <div id="extra">
+        <p>excited to see you! let us know you're coming (or not) by using the calendar RSVP below.</p>
+      </div>
       <form id="cal">
         <!-- TODO: calendar feature — details to come -->
         <input type="email" placeholder="Email for calendar invite" disabled>
