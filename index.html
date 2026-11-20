@@ -27,14 +27,18 @@
       <div id="extra">
         <p>excited to see you! let us know you're coming (or not) by using the calendar RSVP below.</p>
       </div>
-      <form id="cal">
-        <!-- TODO: calendar feature — details to come -->
-        <input type="email" placeholder="Email for calendar invite" disabled>
-        <button type="submit" disabled>Add to calendar</button>
-        <p class="note">Coming soon</p>
+      <form id="cal" autocomplete="off" novalidate hidden>
+        <label for="email">want a calendar invite? drop your email</label>
+        <div class="row">
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required>
+          <button type="submit">add to calendar</button>
+        </div>
+        <!-- honeypot: real users never see/fill this -->
+        <input class="hp" name="website" type="text" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p id="cal-msg" class="note" role="status"></p>
       </form>
       <br/><br/><br/>
-      <footer><a href="#" id="forget">(forget this device)</a></footer>
+      <footer>collage by hannah, site by calvin | <a href="#" id="forget">(forget this device)</a></footer>
     </section>
   </main>
   <script src="app.js" type="module"></script>

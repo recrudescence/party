@@ -77,11 +77,52 @@ function render(party) {
   $("flyer").alt = party.alt || party.title;
   $("flyer").src = URL.createObjectURL(new Blob([b64(party.flyer.data)], { type: party.flyer.mime }));
   if (party.html) $("extra").innerHTML = party.html; // author-controlled, decrypted content
-  // TODO: calendar feature (email field + "Add to calendar") — details to come.
-  // Per-party data is in party.calendar ({ title, timezone, start, end, location, description });
-  // start/end are local wall-clock times in party.calendar.timezone (default America/New_York).
+  setupCalendar(party.calendar);
   $("gate").hidden = true;
   $("invite").hidden = false;
+}
+
+// "Add to calendar": POSTs the guest's email to a Google Apps Script web app (URL comes from the
+// decrypted party.json -> calendar.endpoint), which adds them to the Google Calendar event.
+// Must be a "simple" request: urlencoded body, NO Content-Type header, NO JSON (avoids CORS preflight).
+// TODO: once the Apps Script accepts an event id, also send calendar.eventId in the POST body.
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+let calendarWired = false;
+function setupCalendar(cal) {
+  const form = $("cal");
+  if (!cal || !cal.endpoint) { form.hidden = true; return; }
+  form.hidden = false;
+  if (calendarWired) return;
+  calendarWired = true;
+  const msg = $("cal-msg");
+  const say = (text, isErr) => { msg.textContent = text; msg.classList.toggle("err", !!isErr); };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = form.elements.email.value.trim();
+    if (form.elements.website.value) { say("check your inbox (and spam!) for the invite."); return; } // bot: drop silently
+    if (!EMAIL_RE.test(email)) { say("that email doesn't look right.", true); return; }
+    const btn = form.querySelector("button");
+    btn.disabled = true;
+    say("sending…");
+    try {
+      const res = await fetch(cal.endpoint, { method: "POST", body: new URLSearchParams({ email }) });
+      const data = await res.json();
+      if (data.ok) {
+        say("you're on the list! check your inbox (and spam) for the calendar invite.");
+        form.elements.email.value = "";
+      } else if (data.error) {
+        console.error("calendar error:", data.error);
+        say("something went wrong — try again in a bit.", true);
+      } else {
+        say("that email doesn't look right.", true);
+      }
+    } catch (err) {
+      console.error(err);
+      say("something went wrong — try again in a bit.", true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 function lockIfNeeded() {
