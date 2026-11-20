@@ -1,25 +1,26 @@
 const MAX_FAILS = 5;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
-const KEY = "party_fails";
 
 const $ = (id) => document.getElementById(id);
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 // Soft client-side limiter: a deterrent only, trivially bypassable.
+let party; // { slug, dir, ...party.json }
+const failKey = () => `party_fails:${party.slug}`;
 function recentFails() {
   try {
-    const list = JSON.parse(localStorage.getItem(KEY) || "[]");
+    const list = JSON.parse(localStorage.getItem(failKey()) || "[]");
     return list.filter((t) => Date.now() - t < WINDOW_MS);
   } catch { return []; }
 }
 function recordFail() {
   const list = recentFails(); list.push(Date.now());
-  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}
+  try { localStorage.setItem(failKey(), JSON.stringify(list)); } catch {}
   return list.length;
 }
 
 async function decrypt(password) {
-  const res = await fetch("flyer.enc", { cache: "no-store" });
+  const res = await fetch(`${party.dir}/flyer.enc`, { cache: "no-store" });
   if (!res.ok) throw new Error("load");
   const meta = await res.json();
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
@@ -42,7 +43,32 @@ function lockIfNeeded() {
   }
   return false;
 }
-lockIfNeeded();
+
+// Landing page shows the latest party (by party.json "date"; ties -> later in index.json).
+async function loadLatestParty() {
+  const get = async (url) => {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error("load");
+    return res.json();
+  };
+  const slugs = await get("parties/index.json");
+  const all = await Promise.all(slugs.map(async (slug) =>
+    ({ slug, dir: `parties/${slug}`, ...(await get(`parties/${slug}/party.json`)) })));
+  all.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return all[all.length - 1];
+}
+
+try {
+  party = await loadLatestParty();
+  document.title = party.title;
+  $("title").textContent = party.title;
+  $("flyer").alt = party.alt || party.title;
+  $("gate").hidden = false;
+  lockIfNeeded();
+} catch (err) {
+  console.error(err);
+  $("msg").textContent = "Couldn't load the invite. Open via http(s), not file://.";
+}
 
 $("gate").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -66,3 +92,4 @@ $("gate").addEventListener("submit", async (e) => {
 });
 
 // TODO: calendar feature (email field + "Add to calendar") — details to come.
+// Per-party data lives in party.calendar ({ title, start, end, location, description }).
