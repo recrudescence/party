@@ -86,12 +86,12 @@ function render(party) {
 // "Add to calendar": POSTs the guest's email to a Google Apps Script web app (URL comes from the
 // decrypted party.json -> calendar.endpoint), which adds them to the Google Calendar event.
 // Must be a "simple" request: urlencoded body, NO Content-Type header, NO JSON (avoids CORS preflight).
-// TODO: once the Apps Script accepts an event id, also send calendar.eventId in the POST body.
+// calendar.eventId (required) is sent too, so one script can serve several parties' events.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 let calendarWired = false;
 function setupCalendar(cal) {
   const form = $("cal");
-  if (!cal || !cal.endpoint) { form.hidden = true; return; }
+  if (!cal || !cal.endpoint || !cal.eventId) { form.hidden = true; return; } // needs both
   form.hidden = false;
   if (calendarWired) return;
   calendarWired = true;
@@ -106,7 +106,7 @@ function setupCalendar(cal) {
     btn.disabled = true;
     say("sending…");
     try {
-      const res = await fetch(cal.endpoint, { method: "POST", body: new URLSearchParams({ email }) });
+      const res = await fetch(cal.endpoint, { method: "POST", body: new URLSearchParams({ email, eventId: cal.eventId }) });
       const data = await res.json();
       if (data.ok) {
         say("you're on the list! check your inbox (and spam) for the calendar invite.");
