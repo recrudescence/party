@@ -1,0 +1,6 @@
+# plaintext flyer source — never commit
+src_private/
+.DS_Store
+node_modules/
+
+instructions.md
