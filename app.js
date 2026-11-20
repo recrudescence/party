@@ -4,10 +4,11 @@ const WINDOW_MS = 24 * 60 * 60 * 1000;
 const $ = (id) => document.getElementById(id);
 const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
-let slug; // latest party = last entry in parties/index.json
+let slugs = []; // all parties, oldest -> newest (parties/index.json)
+let slug;       // latest party = last entry; only this one is remembered across visits
 
 // Soft client-side limiter: a deterrent only, trivially bypassable.
-const failKey = () => `party_fails:${slug}`;
+const failKey = () => "party_fails"; // shared across parties: the password picks the party
 function recentFails() {
   try {
     const list = JSON.parse(localStorage.getItem(failKey()) || "[]");
@@ -136,7 +137,7 @@ function lockIfNeeded() {
 }
 
 try {
-  const slugs = await getJSON("parties/index.json");
+  slugs = await getJSON("parties/index.json");
   slug = slugs[slugs.length - 1];
   if (!slug) throw new Error("no parties");
   const cached = await getCachedKey();
@@ -162,11 +163,21 @@ $("gate").addEventListener("submit", async (e) => {
   if (!slug || lockIfNeeded()) return;
   $("msg").textContent = "";
   try {
-    const meta = await getJSON(`parties/${slug}/party.enc`);
-    const key = await deriveKey($("pw").value, meta);
-    const party = await decryptWith(key, meta);
-    await cacheKey(key);
-    render(party);
+    // The password selects the party: try newest first, open the first one that decrypts.
+    let opened = null;
+    for (const s of [...slugs].reverse()) {
+      const meta = await getJSON(`parties/${s}/party.enc`);
+      const key = await deriveKey($("pw").value, meta);
+      try {
+        opened = { s, key, party: await decryptWith(key, meta) };
+        break;
+      } catch (err) {
+        if (err.message !== "badpw") throw err;
+      }
+    }
+    if (!opened) throw new Error("badpw");
+    if (opened.s === slug) await cacheKey(opened.key); // only the latest party is remembered
+    render(opened.party);
   } catch (err) {
     if (err.message !== "badpw") {
       console.error(err);
