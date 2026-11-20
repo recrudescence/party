@@ -20,7 +20,12 @@ if (!party.flyer) { console.error('party.json needs a "flyer" filename'); proces
 const mimes = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
 const mime = mimes[extname(party.flyer).toLowerCase()] || "application/octet-stream";
 
-if (party.calendar) party.calendar.timezone ||= "America/New_York"; // default tz for start/end
+// Shared defaults (e.g. calendar.endpoint, calendar.timezone) from src_private/defaults.json;
+// a party's own party.json values win. Baked into the encrypted bundle, so they stay hidden.
+const defaultsPath = "src_private/defaults.json";
+const defaults = existsSync(defaultsPath) ? JSON.parse(readFileSync(defaultsPath, "utf8")) : {};
+const calendar = { timezone: "America/New_York", ...defaults.calendar, ...party.calendar };
+if (party.calendar || defaults.calendar) party.calendar = calendar;
 
 const b64 = (buf) => Buffer.from(buf).toString("base64");
 const bundle = { ...party, flyer: { mime, data: b64(readFileSync(`${src}/${party.flyer}`)) } };
