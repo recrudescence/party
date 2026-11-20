@@ -19,12 +19,17 @@ function recordFail() {
 }
 
 async function decrypt(password) {
-  const meta = await (await fetch("flyer.enc", { cache: "no-store" })).json();
+  const res = await fetch("flyer.enc", { cache: "no-store" });
+  if (!res.ok) throw new Error("load");
+  const meta = await res.json();
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: b64(meta.salt), iterations: meta.iter, hash: "SHA-256" },
     base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
-  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(meta.iv) }, key, b64(meta.data));
+  let plain;
+  try {
+    plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(meta.iv) }, key, b64(meta.data));
+  } catch { throw new Error("badpw"); }
   return URL.createObjectURL(new Blob([plain], { type: meta.mime }));
 }
 
@@ -47,7 +52,12 @@ $("gate").addEventListener("submit", async (e) => {
     $("flyer").src = await decrypt($("pw").value);
     $("gate").hidden = true;
     $("invite").hidden = false;
-  } catch {
+  } catch (err) {
+    if (err.message !== "badpw") {
+      console.error(err);
+      $("msg").textContent = "Couldn't load the invite (" + err.message + "). Open via http(s), not file://.";
+      return;
+    }
     const n = recordFail();
     $("msg").textContent = n >= MAX_FAILS ? "Too many attempts. Try again later." : "Wrong password.";
     $("pw").value = "";
