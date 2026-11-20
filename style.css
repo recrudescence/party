@@ -16,3 +16,5 @@ button:disabled, input:disabled { opacity:.5; cursor:not-allowed; }
 [hidden] { display:none !important; }
 footer { margin-top:40px; text-align:center; font-size:.75rem; }
 footer a { color:inherit; opacity:.5; }
+.row { display:grid; grid-template-columns:1fr auto; gap:8px; }
+.row input { min-width:0; }
